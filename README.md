@@ -3,6 +3,7 @@
 This repository contains scripts for experiments on threshold queries.
 
 [![DOI](https://zenodo.org/badge/425057454.svg)](https://zenodo.org/badge/latestdoi/425057454)
+[![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 
 ## Requirements
 
