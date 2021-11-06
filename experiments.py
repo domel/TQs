@@ -46,7 +46,7 @@ r_file = tmp_dir + 'r.csv'
 db_name = 'threshold' 
 pg_port = 5433
 
-movie_link_file = '/home/domel/movie_link.csv' # dir for movie_link.csv
+movie_link_file = '/home/user/movie_link.csv' # dir for movie_link.csv
 
 
 if not os.path.exists(results_dir):
