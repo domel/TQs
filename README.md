@@ -31,7 +31,7 @@ data : {
 ### Query specification
 
 * query class (`TQ1`, `TQ2`, `TQ3`)
-* query method (`naive` or `windowed`)
+* implementation method (`naive` or `windowed`)
 * number of joins (`k`)
 * threshold value 
 
@@ -46,7 +46,7 @@ query = {
 
 ## Data
 
-The `movie_link.csv` file is from a 2013 IMDB snapshot used in the paper "How Good Are Query Optimizers, Really?" by Viktor Leis, Andrey Gubichev, Atans Mirchev, Peter Boncz, Alfons Kemper, Thomas Neumann (PVLDB Volume 9, No. 3, 2015).
+The `movie_link.csv` file is from a 2013 IMDb snapshot used in the paper "How Good Are Query Optimizers, Really?" by Viktor Leis, Andrey Gubichev, Atans Mirchev, Peter Boncz, Alfons Kemper, Thomas Neumann (PVLDB Volume 9, No. 3, 2015).
 
 The `movie_link.csv` file can be found in `raw-data`.
 
