@@ -2,6 +2,8 @@
 
 This repository contains scripts for experiments on threshold queries.
 
+[![DOI](https://zenodo.org/badge/425057454.svg)](https://zenodo.org/badge/latestdoi/425057454)
+
 ## Requirements
 
 * [Python 3+](https://www.python.org/) (the recommended version is 3.8 or higher)
