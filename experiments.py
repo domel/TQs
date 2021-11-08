@@ -44,9 +44,9 @@ tmp_dir = '/tmp/'
 results_dir = 'results'
 r_file = tmp_dir + 'r.csv'
 db_name = 'threshold' 
-pg_port = 5433
+pg_port = 5432
 
-movie_link_file = '/home/user/movie_link.csv' # dir for movie_link.csv
+movie_link_file = 'raw-data/movie_link.csv' # dir for movie_link.csv
 
 
 if not os.path.exists(results_dir):
@@ -78,9 +78,8 @@ if not os.path.isdir(results_dir):
 # * kind of data [barabasi albert (ba), imdb, full]
 # * number of nodes (n)          [input param for ba, full]
 # * out degree      (m0)         [input param for ba] 
-# * imdb link types (link-types) [optional input param for imdb]
-# * number of edges (m)          [calculated for ba, imdb, full]
 # * indexing        (indexed)    [input param for ba, imdb, full]
+# * number of edges (m)          [calculated for ba, imdb, full]
 # 
 # The parameter link-types is a collection if link type identifiers (ints). If
 # the link-types is missing for imdb then all types of links are used.
@@ -89,7 +88,7 @@ if not os.path.isdir(results_dir):
 #    'kind'      : {'ba', 'full', 'imdb'}
 #    'n'         : int, 
 #    'm0'        : int,
-#    'link-types : int+, 
+#    'indexed'   : bool, 
 #    'm'         : int,
 # }
 #
@@ -118,9 +117,6 @@ def descr_data(data):
     kind = data['kind']
     if kind == 'imdb':
         descr = 'imdb data'
-        link_types = data.get('link_types')
-        descr += ' with link types ' + descr_link_types(link_types)
-        descr += ' size ' + str(calc_imdb_size(link_types))
     elif kind == 'ba':
         descr = 'barabasi albert for n='+str(data['n'])+' and m0='+str(data['m0'])
     elif kind == 'full':
@@ -156,50 +152,15 @@ def prepare_data(data):
         print('Error: Unsupported data kind',kind)
         exit(1)
 
-# sizes (edge count) of link groups in imdb 
-imdb_size = {
-    'all':29997, 5:8593, 6:5503, 9:5186, 13:3341, 10:2223, 1:1158, 2:1157, 
-    8:781, 7:625, 16:278, 12:247, 15:211, 3:207, 11:204, 4:199, 17: 84
-}
-large_imdb_link_groups = [
-    (5, 1), # 9751
-    (5, 1, 6), # 15254
-    (5, 1, 6, 9), # 20440
-    (5, 1, 6, 9, 13, 2), # 24938
-    ('all',), #29997
-]
-medium_imdb_link_groups = [
-    (9,), # 5186
-    (9, 13), # 8527
-    (9, 13, 10), # 10750
-    (9, 13, 10, 1, 8), # 12689
-    (9, 13, 10, 1, 8, 2, 7), # 14471
-]
-small_imdb_link_groups = [
-    (3, 4), # 406
-    (3, 4, 1), # 1564
-    (3, 4, 1, 2), # 2721
-    (3, 4, 1, 2, 7, 11), # 3550
-    (3, 4, 1, 2, 7, 11, 8, 15), # 4542
-    (3, 4, 1, 2, 7, 11, 8, 15, 12, 16), # 5067
-]
-
-def calc_imdb_size(link_types):
-    if link_types:
-        return sum([imdb_size(t) for t in link_types])
-    else:
-        return imdb_size['all']
-
-def descr_link_types(link_types):
-    if link_types:
-        return '{' + ','.join(map(str,link_types)) + '}'
-    else:
-        return 'all'
+# sizes IMDB data set
+imdb_edge_count = 29997
+imdb_node_count = 21082
 
 # Prepares IMDB data
 def prepare_imdb_data(data):
     link_types = data.get('link_types')
-    data['n'] = calc_imdb_size(link_types)
+    data['n'] = imdb_node_count
+    data['m'] = imdb_edge_count
     script = open(load_script_file,'w')
     script.write('--DROP TABLE IF EXISTS MOVIE_LINK;\n')
     script.write('CREATE TABLE MOVIE_LINK(ID INT, MOVIE_ID INT, LINKED_MOVIE_ID INT, LINK_TYPE_ID INT);\n')
@@ -207,10 +168,7 @@ def prepare_imdb_data(data):
     script.write('DROP TABLE IF EXISTS R;\n');    
     script.write('CREATE TABLE R(A INT, B INT);\n')
     script.write('INSERT INTO R\n')
-    script.write('SELECT MOVIE_ID, LINKED_MOVIE_ID FROM MOVIE_LINK')
-    if link_types:
-        script.write('\nWHERE LINK_TYPE_ID IN %s'%('('+','.join(map(str,link_types))+')',))
-    script.write(';\n')
+    script.write('SELECT MOVIE_ID, LINKED_MOVIE_ID FROM MOVIE_LINK\n;')
     script.write('DROP TABLE MOVIE_LINK;\n')
     if data.get('indexed'):
         script.write('CREATE INDEX ind1 ON R(A);')
@@ -414,30 +372,7 @@ def prep_conn_naiv_query(length,threshold):
     return query
 
 # TQ1 windowed
-# joining forward; slower on IMDb
-def prep_path_wind_query_forward(length,threshold):
-    query = 'WITH\n'
-    for j in range(1,length+1):
-        query += 'J%i AS '%(j,)
-        if j == 1:
-            query += '(SELECT DISTINCT A AS X0, B AS X%i FROM R),\n'%(j,)
-        else:
-            query += '(SELECT DISTINCT S%i.X0, R.B AS X%i\n'%(j-1,j)
-            query += '       FROM S%i, R\n'%(j-1)
-            query += '       WHERE S%i.X%i = R.A),\n'%(j-1,j-1)
-        query += 'W%i AS '%(j,)
-        query += '(SELECT X0, X%i, ROW_NUMBER() OVER (PARTITION BY X%i) AS RK FROM J%i),\n'%(j,j,j,)
-        query += 'S%i AS '%(j,)
-        query += '(SELECT X0, X%i FROM W%i WHERE RK <= %i)'%(j,j,threshold,)
-        if j < length :
-            query += ','
-        query +='\n'
-    query += 'SELECT X0, X%i FROM S%i LIMIT %i;'%(length,length,threshold)
-
-    return query
-
-# joining backward; faster on IMDb. USE THIS ONE
-def prep_path_wind_query_backward(length,threshold):
+def prep_path_wind_query(length,threshold):
     query = 'WITH\n'
     for j in reversed(range(1, length + 1)):
         query += 'J%i AS '%(j,)
@@ -460,29 +395,7 @@ def prep_path_wind_query_backward(length,threshold):
 
 
 # TQ2 windowed
-# joining forward, slower on IMDb; INCORRECT !!!
-def prep_neig_wind_query_forward(length,threshold):
-    query = 'WITH\n'
-    for j in range(1,length+1):
-        query += 'J%i AS '%(j,)
-        if j == 1:
-            query += '(SELECT DISTINCT A AS X0, B AS X%i FROM R),\n'%(j,)
-        else:
-            query += '(SELECT DISTINCT S%i.X0, R.B AS X%i\n'%(j-1,j)
-            query += '       FROM S%i, R\n'%(j-1)
-            query += '       WHERE S%i.X%i = R.A),\n'%(j-1,j-1)
-        query += 'W%i AS '%(j,)
-        query += '(SELECT X0, X%i, ROW_NUMBER() OVER (PARTITION BY X%i) AS RK FROM J%i),\n'%(j,j,j,)
-        query += 'S%i AS '%(j,)
-        query += '(SELECT X0, X%i FROM W%i WHERE RK <= %i),\n'%(j,j,threshold,)
-    query += 'C AS (SELECT X0, COUNT(*) CNT FROM S%i GROUP BY X0),\n'%(length,)
-    query += 'S AS (SELECT X0 FROM C WHERE CNT >= %i)\n'%(threshold,)
-    query += 'SELECT X0 FROM S;'
-
-    return query
-
-# joining backward, faster on IMDb; USE THIS ONE
-def prep_neig_wind_query_backward(length,threshold):
+def prep_neig_wind_query(length,threshold):
     query = 'WITH\n'
     for j in reversed(range(1, length + 1)):
         query += 'J%i AS '%(j,)
@@ -504,8 +417,7 @@ def prep_neig_wind_query_backward(length,threshold):
 
 
 # TQ3 windowed
-# joining forward, faster on IMDb; USE THIS ONE
-def prep_conn_wind_query_forward(length,threshold):
+def prep_conn_wind_query(length,threshold):
     query = 'WITH\n'
     query += 'S1 AS '
     query += '(SELECT DISTINCT A AS X0, B AS X1 FROM R),\n'
@@ -534,41 +446,10 @@ def prep_conn_wind_query_forward(length,threshold):
     
     return query
 
-
-# joining backward, slower on IMDb
-def prep_conn_wind_query_backward(length,threshold):
-    query = 'WITH\n'
-    query += 'S1 AS '
-    query += '(SELECT DISTINCT B AS X0, A AS X1 FROM R),\n'
-    for j in range(2,length+1):
-        query += 'J%i AS '%(j,)
-        query += '(SELECT DISTINCT '
-        query += ''.join(['S%i.X%i, '%(j-1,i) for i in range(j)])
-        query += 'R.A AS X%i '%(j,)
-        query += '\n'
-        query += '       FROM S%i, R\n'%(j-1)
-        query += '       WHERE S%i.X%i = R.B),\n'%(j-1,j-1)
-        query += 'W%i AS '%(j,)
-        query += '(SELECT ' 
-        query += ''.join(['X%i, '%(i,) for i in range(j+1)])
-        query += 'ROW_NUMBER() OVER (PARTITION BY X0, X%i) AS RK '%(j,) 
-        query += 'FROM J%i),\n'%(j)
-        query += 'S%i AS '%(j,)
-        query += '(SELECT ' 
-        query += ', '.join(['X%i'%(i,) for i in range(j+1)]) + ' '
-        query += 'FROM W%i WHERE RK <= %i)'%(j,threshold)
-        if j < length :
-            query += ','
-        query +='\n'
-    query += 'SELECT X%i, X0 FROM S%i GROUP BY X0, X%i HAVING COUNT(*)>=%i'%(
-        length,length,length,threshold)
-    
-    return query
-
 query_constructors = {
-    'TQ1' : {'naive':prep_path_naiv_query, 'windowed':prep_path_wind_query_backward},
-    'TQ2' : {'naive':prep_neig_naiv_query, 'windowed':prep_neig_wind_query_backward},
-    'TQ3' : {'naive':prep_conn_naiv_query, 'windowed':prep_conn_wind_query_forward},
+    'TQ1' : {'naive':prep_path_naiv_query, 'windowed':prep_path_wind_query},
+    'TQ2' : {'naive':prep_neig_naiv_query, 'windowed':prep_neig_wind_query},
+    'TQ3' : {'naive':prep_conn_naiv_query, 'windowed':prep_conn_wind_query},
 }
 
 #
@@ -592,9 +473,8 @@ def prepare_query(query, timeout=None):
     length = query['k'] + 1
     threshold = query['threshold']
     query_str = query_constructors[kind][method](length,threshold)
-    # print(query_descr(query))
-    # print(query_str)
     script = open(query_script_file,'w')
+
     script.write('SET max_parallel_workers_per_gather = 0;\n')
     if timeout:
         script.write('SET statement_timeout = %d;\n'%(timeout,))
@@ -620,6 +500,7 @@ def parse_psql_output(s):
 
     if PSQL_TIMEOUT_MSG in s:
         return 'TIMEOUT'
+
     t = s.split('\n')[-1]
     time_start = s.find('Time: ')+len('Time: ')
     time_end = s.find(' ms',time_start)
@@ -743,6 +624,22 @@ def run_experiments(datas, queries, **params):
         report_f.flush()
 
 if __name__ == '__main__':
+
+    # TQ All classes on Real data (IMDB)
+    datas = [ 
+        {'kind' : 'imdb', 
+         'link-type' : ('all',), 
+         'runs' : 3, 
+         'indexed' : indexed}
+        for indexed in {False,True}
+    ] 
+    queries = [
+        {'kind':kind, 'method':method, 'k':k, 'threshold':10}
+        for k in[1]
+        for kind in ['TQ1','TQ2','TQ3']
+        for method in ['naive','windowed']
+    ]
+    run_experiments(datas,queries,name='IMDB.K1-10',runs=3,timeout=1800000)
 
     # TQ Class 1 (paths) on Synthetic data (Barabási–Albert)
     # TQ Class 2 (neighborhood) on Synthetic data (Barabási–Albert)

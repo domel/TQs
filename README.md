@@ -17,7 +17,6 @@ This repository contains scripts for experiments on threshold queries.
 * dataset [barabasi albert (`ba`), `imdb`, `full`]
 * number of nodes (`n`)          [input param for ba, full]
 * out degree      (`m0`)         [input param for ba] 
-* imdb link types (`link-types`) [optional input param for imdb]
 * number of edges (`m`)          [calculated for ba, imdb, full]
 * indexing        (`indexed`)    [input param for ba, imdb, full]
 
@@ -26,7 +25,7 @@ data : {
    'kind'      : {'ba', 'full', 'imdb'}
    'n'         : int, 
    'm0'        : int,
-   'link-types : int+, 
+   'indexed'   : bool,
    'm'         : int,
 }
 ```
