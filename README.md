@@ -46,6 +46,10 @@ query = {
 }
 ```
 
+### Output
+The time measurements of a series of experiments will be output in the directory `results`.
+
+
 ## Data
 
 The `movie_link.csv` file is from a 2013 IMDb snapshot used in the paper "How Good Are Query Optimizers, Really?" by Viktor Leis, Andrey Gubichev, Atans Mirchev, Peter Boncz, Alfons Kemper, Thomas Neumann (PVLDB Volume 9, No. 3, 2015).

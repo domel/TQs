@@ -625,22 +625,6 @@ def run_experiments(datas, queries, **params):
 
 if __name__ == '__main__':
 
-    # TQ All classes on Real data (IMDB)
-    datas = [ 
-        {'kind' : 'imdb', 
-         'link-type' : ('all',), 
-         'runs' : 3, 
-         'indexed' : indexed}
-        for indexed in {False,True}
-    ] 
-    queries = [
-        {'kind':kind, 'method':method, 'k':k, 'threshold':10}
-        for k in[1]
-        for kind in ['TQ1','TQ2','TQ3']
-        for method in ['naive','windowed']
-    ]
-    run_experiments(datas,queries,name='IMDB.K1-10',runs=3,timeout=1800000)
-
     # TQ Class 1 (paths) on Synthetic data (Barabási–Albert)
     # TQ Class 2 (neighborhood) on Synthetic data (Barabási–Albert)
     # TQ Class 3 (connectivity) on Synthetic data (Barabási–Albert)
