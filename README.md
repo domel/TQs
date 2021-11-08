@@ -47,7 +47,7 @@ query = {
 ```
 
 ### Output
-The time measurements of a series of experiments will be output in the directory `results`.
+The time measurements of a series of experiments will be output in the directory `results` (this directory will be created if needed). 
 
 
 ## Data
